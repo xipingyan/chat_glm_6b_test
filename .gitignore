@@ -1,0 +1,4 @@
+py-env-chatglm-6b
+ir_output/
+local_chat_glm_6b_model/
+onnx_output_cg/
