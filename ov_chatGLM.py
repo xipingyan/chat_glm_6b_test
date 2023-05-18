@@ -12,12 +12,15 @@ import numpy as np
 import onnxruntime as ort
 from openvino.runtime import Core
 from openvino.runtime import compile_model
-from openvino.tools.mo import convert_model
+# from openvino.tools.mo import convert_model
 from transformers.modeling_outputs import (
     CausalLMOutputWithPast
 )
 from transformers.generation.utils import LogitsProcessorList
 #from transformers.onnx import export, FeaturesManager
+
+# import subprocess
+# subprocess.Popen(["/bin/sh", "source ../openvino/build/install/setupvars.sh"])
 
 model_path="./local_chat_glm_6b_model"
 tokenizer = ChatGLMTokenizer.from_pretrained(model_path)
@@ -159,7 +162,8 @@ def generate_sequence(engine,inputs,max_sequence_length=128,
     unfinished_sequences = torch.from_numpy(inputs['input_ids']).new(inputs['input_ids'].shape[0]).fill_(1)
     while True:
         #cur_input_len = len(inputs['input_ids'][0])
-        if engine == "OV":
+        if engine == "OV":            
+            print("Start infer_new_request.")
             outputs = compiled_model.infer_new_request(inputs)
             next_token_logits = outputs["lm_logits"][:, -1, :]
         elif engine == "ORT":
@@ -252,10 +256,12 @@ read_end = 0
 compile_end = 0
 
 if args.engine == "OV":
-    ov_model_path = 'ir_output/chat_glm_6b.xml'
+    ov_model_path = 'ov_output/chat_glm_6b.xml'
     core = Core()
-    core.set_property({'CACHE_DIR': './cache'})
+    # Auto cache and loading.
+    core.set_property({'CACHE_DIR': './cache_ov'})
 
+    print("Start read_model. ", ov_model_path)
     read_start = time.time()
     model = core.read_model(ov_model_path)
     read_end = time.time()
@@ -274,16 +280,6 @@ else:
     model = model.eval()
     read_end = time.time()
     compile_end = read_end
-    
-
-
-'''if len(os.listdir('./cache')) == 0:
-    compiled_model = core.compile_model(model, "CPU")
-else:
-    with open("./cache/2837257853081794530.blob", 'rb') as f:
-        buf = BytesIO(f.read())
-        compiled_model = core.import_model(buf, "CPU")'''
-
 
 output_ids = generate_sequence(args.engine,inputs)
 #inp_tokenizer = tokenizer(args.prompt, return_tensors="pt").to("cpu")
