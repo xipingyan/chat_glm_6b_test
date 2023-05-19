@@ -159,11 +159,16 @@ def prepare_inputs_for_generation(
 
 def generate_sequence(engine,inputs,max_sequence_length=128,
                       eos_token_id=eos_token_id, dynamic_shapes=True):
+    
     unfinished_sequences = torch.from_numpy(inputs['input_ids']).new(inputs['input_ids'].shape[0]).fill_(1)
     while True:
-        #cur_input_len = len(inputs['input_ids'][0])
-        if engine == "OV":            
-            print("Start infer_new_request.")
+        # cur_input_len = len(inputs['input_ids'][0])
+        # print("cur_input_len =", cur_input_len)
+        # print("unfinished_sequences =", unfinished_sequences)
+        # print("inputs['input_ids'][0] =", inputs['input_ids'][0])
+
+        if engine == "OV":
+            # print("Start infer_new_request.")
             outputs = compiled_model.infer_new_request(inputs)
             next_token_logits = outputs["lm_logits"][:, -1, :]
         elif engine == "ORT":
@@ -260,14 +265,22 @@ if args.engine == "OV":
     core = Core()
     # Auto cache and loading.
     core.set_property({'CACHE_DIR': './cache_ov'})
+    # core.set_property({'NUM_STREAMS' : 1})
+    # core.set_property({'INFERENCE_NUM_THREADS' : 32})
+    # core.set_property({'AFFINITY' : "CORE"})
 
     print("Start read_model. ", ov_model_path)
     read_start = time.time()
     model = core.read_model(ov_model_path)
-    read_end = time.time()
-
+    read_end = time.time()    
+    print("Start compile model.")
     compiled_model = core.compile_model(model, "CPU")
     compile_end = time.time()
+    
+    print("NUM_STREAMS =", compiled_model.get_property("NUM_STREAMS"))
+    print("INFERENCE_NUM_THREADS =", compiled_model.get_property("INFERENCE_NUM_THREADS"))
+    print("PERFORMANCE_HINT =", compiled_model.get_property("PERFORMANCE_HINT")) # LATENCY
+
 elif args.engine == "ORT":
     ort_model_path = 'onnx_output_cg/chat_glm_6b.onnx'
     read_start = time.time()
